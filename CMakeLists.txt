@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.6)
 project(PosixThreadPool)
 
-set(CMAKE_CXX_FLAGS "-std=c++98")
+set(CMAKE_CXX_STANDARD 98)
 
 set(SRC threadPoolExample.cpp ThreadPool.cpp)
 
