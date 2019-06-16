@@ -1,55 +1,116 @@
 #ifndef TEST_FUNCTION_THREADPOOL_HPP
 #define TEST_FUNCTION_THREADPOOL_HPP
 
+#include <pthread.h>
 #include <vector>
-#include <functional>
-#include <future>
 #include <queue>
-#include <memory>
 
-namespace threadUtils
-{
+namespace threadUtils {
 
-class ThreadPool
-{
+void *startThread(void *context);
+
+class ThreadPool {
 public:
+    enum Priority {
+        low,
+        normal,
+        high
+    };
+
     ThreadPool(size_t);
 
-    template<class F, class ... Args>
-    std::future<typename std::result_of<F(Args...)>::type> addTask(F&&, Args&& ...);
+    bool Init();
+
+    template<class T>
+    bool Enqueue(T& task, Priority priority = normal);
+
+    void StopIfAllDone();
+
+    void Stop();
+
+    bool IsWorking() const;
 
     ~ThreadPool();
+
 private:
+    friend void *startThread(void *context);
+
+    class TaskBase {
+    public:
+        TaskBase(Priority priority) : m_priority(priority) {}
+
+        virtual ~TaskBase() {}
+
+        virtual void run() = 0;
+
+        Priority getPriority() const { return m_priority; }
+
+    private:
+        Priority m_priority;
+    };
+
+    template<class T>
+    class TaskT : public TaskBase {
+        T& m_task;
+    public:
+        TaskT(T& task, Priority priority) : TaskBase(priority), m_task(task) {}
+
+        virtual void run() { m_task.run(); }
+    };
+
     void threadFunc();
 
-    std::queue<std::function<void()>> m_tasks;
-    std::vector<std::thread> m_workers;
+    void deleteTasks(std::queue<TaskBase *>& queue);
 
-    std::mutex m_mut;
-    std::condition_variable m_cv;
+    template<class T>
+    void enqueuePrioritizedTask(T& task, Priority priority);
 
-    std::atomic<bool> m_stop;
-};
-
-template<class F, class ... Args>
-std::future<typename std::result_of<F(Args...)>::type> ThreadPool::addTask(F&& f, Args&&... args)
-{
-    using retType = typename std::result_of<F(Args ...)>::type;
-    auto task = std::make_shared< std::packaged_task<retType()> >([f=f, args...] () { return f(std::move(args)...); });
-    auto ret = task->get_future();
-
-    {
-        std::unique_lock<std::mutex> lc(m_mut);
-        if (m_stop) {
-            throw std::runtime_error("Trying to add new task to stopped ThreadPool");
-        }
-
-        m_tasks.emplace([task] () { (*task)(); });
+    bool isTaskWaiting() const {
+        return !m_lowTasks.empty() || !m_normalTasks.empty() ||
+               !m_highTasks.empty();
     }
 
-    m_cv.notify_one();
+    size_t m_workersCount;
+    size_t m_highTaskResolved;
+    std::queue<TaskBase *> m_highTasks;
+    std::queue<TaskBase *> m_normalTasks;
+    std::queue<TaskBase *> m_lowTasks;
+    std::vector<pthread_t> m_workers;
 
-    return ret;
+    mutable pthread_mutex_t m_mut;
+    pthread_cond_t m_cv;
+
+    volatile bool m_stop;
+};
+
+template<class T>
+bool ThreadPool::Enqueue(T& task, Priority priority) {
+    pthread_mutex_lock(&m_mut);
+    if (m_stop) {
+        pthread_mutex_unlock(&m_mut);
+        return false;
+    }
+
+    enqueuePrioritizedTask(task, priority);
+
+    pthread_mutex_unlock(&m_mut);
+
+    pthread_cond_signal(&m_cv);
+
+    return true;
+}
+
+template<class T>
+void ThreadPool::enqueuePrioritizedTask(T& task,
+                                        threadUtils::ThreadPool::Priority priority) {
+    if (priority == low) {
+        m_lowTasks.push(new TaskT<T>(task, priority));
+        // todo: consider using nothrow version of new
+    } else if (priority == normal) {
+        m_normalTasks.push(new TaskT<T>(task, priority));
+    } else {
+        m_highTasks.push(new TaskT<T>(task, priority));
+    }
 }
 
 }
