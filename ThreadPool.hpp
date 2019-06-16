@@ -24,11 +24,9 @@ public:
     template<class T>
     bool Enqueue(T& task, Priority priority = normal);
 
-    void StopIfAllDone();
+    void StopIfNoTasks();
 
     void Stop();
-
-    bool IsWorking() const;
 
     ~ThreadPool();
 
@@ -37,23 +35,16 @@ private:
 
     class TaskBase {
     public:
-        TaskBase(Priority priority) : m_priority(priority) {}
-
         virtual ~TaskBase() {}
 
         virtual void run() = 0;
-
-        Priority getPriority() const { return m_priority; }
-
-    private:
-        Priority m_priority;
     };
 
     template<class T>
     class TaskT : public TaskBase {
         T& m_task;
     public:
-        TaskT(T& task, Priority priority) : TaskBase(priority), m_task(task) {}
+        TaskT(T& task) : m_task(task) {}
 
         virtual void run() { m_task.run(); }
     };
@@ -71,7 +62,7 @@ private:
     }
 
     size_t m_workersCount;
-    size_t m_highTaskResolved;
+    unsigned long int m_highTaskResolved;
     std::queue<TaskBase *> m_highTasks;
     std::queue<TaskBase *> m_normalTasks;
     std::queue<TaskBase *> m_lowTasks;
@@ -104,12 +95,12 @@ template<class T>
 void ThreadPool::enqueuePrioritizedTask(T& task,
                                         threadUtils::ThreadPool::Priority priority) {
     if (priority == low) {
-        m_lowTasks.push(new TaskT<T>(task, priority));
+        m_lowTasks.push(new TaskT<T>(task));
         // todo: consider using nothrow version of new
     } else if (priority == normal) {
-        m_normalTasks.push(new TaskT<T>(task, priority));
+        m_normalTasks.push(new TaskT<T>(task));
     } else {
-        m_highTasks.push(new TaskT<T>(task, priority));
+        m_highTasks.push(new TaskT<T>(task));
     }
 }
 

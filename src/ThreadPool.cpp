@@ -40,7 +40,7 @@ bool ThreadPool::Init() {
     return true;
 }
 
-void ThreadPool::StopIfAllDone()
+void ThreadPool::StopIfNoTasks()
 {
     while (isTaskWaiting()) {
         pthread_yield();
@@ -96,7 +96,11 @@ void ThreadPool::threadFunc() {
         if (!taskPtr && !m_normalTasks.empty()) {
             taskPtr = m_normalTasks.front();
             m_normalTasks.pop();
-            m_highTaskResolved = std::max((size_t)0, m_highTaskResolved - 3);
+            if (m_highTaskResolved < 3) {
+                m_highTaskResolved = 0;
+            } else {
+                m_highTaskResolved -= 3;
+            }
         }
 
         pthread_mutex_unlock(&m_mut);
@@ -114,15 +118,6 @@ void ThreadPool::deleteTasks(std::queue<TaskBase *> &queue) {
         queue.pop();
         delete ptr;
     }
-}
-
-bool ThreadPool::IsWorking() const {
-    bool ret = true;
-    pthread_mutex_lock(&m_mut);
-    ret = isTaskWaiting();
-    pthread_mutex_unlock(&m_mut);
-
-    return ret;
 }
 
 ThreadPool::~ThreadPool() {
