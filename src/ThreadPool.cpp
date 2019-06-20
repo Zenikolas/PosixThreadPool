@@ -11,9 +11,10 @@ void *startThread(void *context) {
     return NULL;
 }
 
-ThreadPool::ThreadPool(size_t nth) : m_workersCount(nth),
-                                     m_highTaskResolved(0),
-                                     m_stop(false) {}
+ThreadPool::ThreadPool(size_t numTasks, size_t queueTaskSize) : m_workersCount(numTasks),
+                                                                m_queueMaxSize(queueTaskSize),
+                                                                m_highTaskResolved(0),
+                                                                m_stop(false) {}
 
 bool ThreadPool::Init() {
     if (pthread_mutex_init(&m_mut, NULL)) {
@@ -40,8 +41,7 @@ bool ThreadPool::Init() {
     return true;
 }
 
-void ThreadPool::StopIfNoTasks()
-{
+void ThreadPool::StopIfNoTasks() {
     while (isTaskWaiting()) {
         pthread_yield();
     }
@@ -49,17 +49,20 @@ void ThreadPool::StopIfNoTasks()
     Stop();
 
 }
+
 void ThreadPool::Stop() {
     pthread_mutex_lock(&m_mut);
+    if (m_stop) {
+        pthread_mutex_unlock(&m_mut);
+        return;
+    }
     m_stop = true;
-    pthread_mutex_unlock(&m_mut);
-
     pthread_cond_broadcast(&m_cv);
+    pthread_mutex_unlock(&m_mut);
 
     for (size_t i = 0; i < m_workers.size(); ++i) {
         void *ret = NULL;
         pthread_join(m_workers[i], &ret);
-        pthread_cond_broadcast(&m_cv);
     }
 
     deleteTasks(m_lowTasks);
