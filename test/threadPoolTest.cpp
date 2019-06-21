@@ -22,8 +22,6 @@ public:
 TEST(ThreadPoolTest, smoke)
 {
     threadUtils::ThreadPool threadPool(4);
-    ASSERT_TRUE(threadPool.Init());
-
     CallableMock callable;
     const size_t N = 200;
     EXPECT_CALL(callable, run()).Times(N);
@@ -44,8 +42,6 @@ TEST(ThreadPoolTest, ordering)
     Waiter waiter;
 
     threadUtils::ThreadPool threadPool(1);
-    ASSERT_TRUE(threadPool.Init());
-
     const size_t lowCallableSize = 6;
     const size_t normalCallableSize = 4;
     const size_t highCallableSize = 6;

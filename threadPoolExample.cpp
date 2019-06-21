@@ -31,22 +31,14 @@ public:
 
 int main()
 {
-    threadUtils::ThreadPool threadPool(2);
-
-    std::cout << "Initialization... " << std::endl;
-
-    if (!threadPool.Init()) {
-        std::cerr << "Failed to init thread pool, exiting ..." << std::endl;
-    }
-
-    std::cout << "Initialization of threadpool passed!" << std::endl;
-
     const size_t N = 200;
     std::vector<CalculateFibonacci> numbers;
     numbers.reserve(N);
     for (size_t i = 0; i < N; ++i) {
         numbers.push_back(CalculateFibonacci(i));
     }
+
+    threadUtils::ThreadPool threadPool(2);
 
     for (size_t i = 0; i < N; ++i) {
         threadPool.Enqueue(numbers[i]);
@@ -57,7 +49,6 @@ int main()
     threadPool.StopIfNoTasks();
 
     std::cout << "All jobs are done!" << std::endl;
-
 
     for (size_t i = 0; i < N; ++i) {
         std::cout << "Fib[" << i << "]: " << numbers[i].get() << std::endl;

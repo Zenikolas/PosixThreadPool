@@ -1,6 +1,7 @@
 #include <iostream>
 #include <assert.h>
 #include <algorithm>
+#include <stdio.h>
 #include "ThreadPool.hpp"
 
 namespace threadUtils {
@@ -14,15 +15,13 @@ void *startThread(void *context) {
 ThreadPool::ThreadPool(size_t numTasks, size_t queueTaskSize) : m_workersCount(numTasks),
                                                                 m_queueMaxSize(queueTaskSize),
                                                                 m_highTaskResolved(0),
-                                                                m_stop(false) {}
-
-bool ThreadPool::Init() {
+                                                                m_stop(false) {
     if (pthread_mutex_init(&m_mut, NULL)) {
-        return false;
+        throw std::runtime_error("Failed to init pthread_mutex");
     }
 
     if (pthread_cond_init(&m_cv, NULL)) {
-        return false;
+        throw std::runtime_error("Failed to init pthread_cond");
     }
 
     m_workers.reserve(m_workersCount);
@@ -31,14 +30,13 @@ bool ThreadPool::Init() {
         pthread_t tid = 0;
         int err = pthread_create(&tid, NULL, startThread, this);
         if (err) {
-            std::cerr << "Failed to created thread, error code : " << err << std::endl;
-            return false;
+            char buffer[64];
+            sprintf(buffer, "Failed to created thread, error code : %d", err);
+            throw std::runtime_error(buffer);
         }
 
         m_workers.push_back(tid);
     }
-
-    return true;
 }
 
 void ThreadPool::StopIfNoTasks() {

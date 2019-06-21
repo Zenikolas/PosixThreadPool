@@ -22,8 +22,6 @@ public:
 
     ThreadPool(size_t numTasks, size_t queueTaskSize = MAX_TASK_SIZE);
 
-    bool Init();
-
     template<class T>
     bool Enqueue(T &task, Priority priority = normal);
 
@@ -80,7 +78,7 @@ private:
     mutable pthread_mutex_t m_mut;
     pthread_cond_t m_cv;
 
-    volatile bool m_stop;
+    bool m_stop;
 };
 
 template<class T>
