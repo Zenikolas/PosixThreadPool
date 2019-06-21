@@ -29,7 +29,7 @@ TEST(ThreadPoolTest, smoke)
     EXPECT_CALL(callable, run()).Times(N);
 
     for (size_t i = 0; i < N; ++i) {
-        threadPool.Enqueue(callable);
+        EXPECT_TRUE(threadPool.Enqueue(callable));
     }
 
 
@@ -77,15 +77,15 @@ TEST(ThreadPoolTest, ordering)
     threadPool.Enqueue(waiter);
     sleep(5);
     for (size_t i = 0; i < lowCallableSize; ++i) {
-        threadPool.Enqueue(lowCallable[i], threadUtils::ThreadPool::low);
+        EXPECT_TRUE(threadPool.Enqueue(lowCallable[i], threadUtils::ThreadPool::low));
     }
 
     for (size_t i = 0; i < normalCallableSize; ++i) {
-        threadPool.Enqueue(normalCallable[i], threadUtils::ThreadPool::normal);
+        EXPECT_TRUE(threadPool.Enqueue(normalCallable[i], threadUtils::ThreadPool::normal));
     }
 
     for (size_t i = 0; i < highCallableSize; ++i) {
-        threadPool.Enqueue(highCallable[i], threadUtils::ThreadPool::high);
+        EXPECT_TRUE(threadPool.Enqueue(highCallable[i], threadUtils::ThreadPool::high));
     }
 
     start = true;
