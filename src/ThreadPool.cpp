@@ -20,7 +20,11 @@ ThreadPool::ThreadPool(size_t numTasks, size_t queueTaskSize) : m_workersCount(n
         throw std::runtime_error("Failed to init pthread_mutex");
     }
 
-    if (pthread_cond_init(&m_cv, NULL)) {
+    if (pthread_cond_init(&m_cvNewTask, NULL)) {
+        throw std::runtime_error("Failed to init pthread_cond");
+    }
+
+    if (pthread_cond_init(&m_cvAllReady, NULL)) {
         throw std::runtime_error("Failed to init pthread_cond");
     }
 
@@ -39,40 +43,60 @@ ThreadPool::ThreadPool(size_t numTasks, size_t queueTaskSize) : m_workersCount(n
     }
 }
 
-void ThreadPool::StopIfNoTasks() {
-    while (isTaskWaiting()) {
-        pthread_yield();
-    }
-
-    Stop();
-
-}
-
 void ThreadPool::Stop() {
     pthread_mutex_lock(&m_mut);
+    stopUnlockJoin();
+}
+
+void ThreadPool::StopBlocking()
+{
+    pthread_mutex_lock(&m_mut);
+    if (!isTaskWaiting()) {
+        stopUnlockJoin();
+        return;
+    }
+
+    while (isTaskWaiting() && !m_stop) {
+        pthread_cond_wait(&m_cvAllReady, &m_mut);
+    }
+
+    stopUnlockJoin();
+}
+
+void ThreadPool::stopImpl()
+{
     if (m_stop) {
-        pthread_mutex_unlock(&m_mut);
         return;
     }
     m_stop = true;
-    pthread_cond_broadcast(&m_cv);
-    pthread_mutex_unlock(&m_mut);
-
-    for (size_t i = 0; i < m_workers.size(); ++i) {
-        void *ret = NULL;
-        pthread_join(m_workers[i], &ret);
-    }
 
     deleteTasks(m_lowTasks);
     deleteTasks(m_normalTasks);
     deleteTasks(m_highTasks);
+
+    pthread_cond_broadcast(&m_cvNewTask);
+}
+
+void ThreadPool::joinWorkers()
+{
+    for (size_t i = 0; i < m_workers.size(); ++i) {
+        void *ret = NULL;
+        pthread_join(m_workers[i], &ret);
+    }
+}
+
+void ThreadPool::stopUnlockJoin()
+{
+    stopImpl();
+    pthread_mutex_unlock(&m_mut);
+    joinWorkers();
 }
 
 void ThreadPool::threadFunc() {
     while (true) {
         pthread_mutex_lock(&m_mut);
         while (!isTaskWaiting() && !m_stop) {
-            pthread_cond_wait(&m_cv, &m_mut);
+            pthread_cond_wait(&m_cvNewTask, &m_mut);
         }
 
         if (m_stop) {
@@ -102,6 +126,10 @@ void ThreadPool::threadFunc() {
             } else {
                 m_highTaskResolved -= 3;
             }
+        }
+
+        if (!isTaskWaiting()) {
+            pthread_cond_broadcast(&m_cvAllReady);
         }
 
         pthread_mutex_unlock(&m_mut);

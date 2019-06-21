@@ -25,9 +25,9 @@ public:
     template<class T>
     bool Enqueue(T &task, Priority priority = normal);
 
-    void StopIfNoTasks();
-
     void Stop();
+
+    void StopBlocking();
 
     ~ThreadPool();
 
@@ -38,6 +38,10 @@ private:
     ThreadPool &operator=(const ThreadPool &rhs);
 
     friend void *startThread(void *context);
+
+    void stopImpl();
+    void joinWorkers();
+    void stopUnlockJoin();
 
     class TaskBase {
     public:
@@ -76,7 +80,8 @@ private:
     std::vector<pthread_t> m_workers;
 
     mutable pthread_mutex_t m_mut;
-    pthread_cond_t m_cv;
+    pthread_cond_t m_cvNewTask;
+    pthread_cond_t m_cvAllReady;
 
     bool m_stop;
 };
@@ -95,7 +100,7 @@ bool ThreadPool::Enqueue(T &task, Priority priority) {
         return false;
     }
 
-    pthread_cond_signal(&m_cv);
+    pthread_cond_signal(&m_cvNewTask);
     pthread_mutex_unlock(&m_mut);
 
     return true;

@@ -31,7 +31,7 @@ TEST(ThreadPoolTest, smoke)
     }
 
 
-    threadPool.StopIfNoTasks();
+    threadPool.StopBlocking();
 
     ASSERT_FALSE(threadPool.Enqueue(callable));
 }
@@ -86,5 +86,5 @@ TEST(ThreadPoolTest, ordering)
 
     start = true;
 
-    threadPool.StopIfNoTasks();
+    threadPool.StopBlocking();
 }

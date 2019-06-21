@@ -46,7 +46,7 @@ int main()
 
     std::cout << "Jobs for ThreadPool enqueued" << std::endl;
 
-    threadPool.StopIfNoTasks();
+    threadPool.StopBlocking();
 
     std::cout << "All jobs are done!" << std::endl;
 
