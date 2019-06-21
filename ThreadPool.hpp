@@ -4,6 +4,7 @@
 #include <pthread.h>
 #include <vector>
 #include <queue>
+#include <iostream>
 
 namespace threadUtils {
 

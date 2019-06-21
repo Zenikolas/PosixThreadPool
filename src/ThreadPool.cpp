@@ -116,7 +116,7 @@ void ThreadPool::threadFunc() {
 }
 
 void ThreadPool::deleteTasks(std::queue<TaskBase *> &queue) {
-    for (size_t i = 0; i < queue.size(); ++i) {
+    while (!queue.empty()) {
         TaskBase *ptr = queue.front();
         queue.pop();
         delete ptr;
