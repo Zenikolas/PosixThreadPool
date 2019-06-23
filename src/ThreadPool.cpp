@@ -16,17 +16,12 @@ ThreadPool::ThreadPool(size_t numTasks, size_t queueTaskSize) : m_workersCount(n
                                                                 m_queueMaxSize(queueTaskSize),
                                                                 m_highTaskResolved(0),
                                                                 m_stop(false) {
+
     if (pthread_mutex_init(&m_mut, NULL)) {
         throw std::runtime_error("Failed to init pthread_mutex");
     }
 
-    if (pthread_cond_init(&m_cvNewTask, NULL)) {
-        throw std::runtime_error("Failed to init pthread_cond");
-    }
-
-    if (pthread_cond_init(&m_cvAllReady, NULL)) {
-        throw std::runtime_error("Failed to init pthread_cond");
-    }
+    initConds();
 
     m_workers.reserve(m_workersCount);
 
@@ -75,6 +70,10 @@ void ThreadPool::stopImpl()
     deleteTasks(m_highTasks);
 
     pthread_cond_broadcast(&m_cvNewTask);
+    pthread_cond_broadcast(&m_cvAllReady);
+    pthread_cond_broadcast(&m_cvLowEnrolled);
+    pthread_cond_broadcast(&m_cvNormalEnrolLed);
+    pthread_cond_broadcast(&m_cvHighEnrolled);
 }
 
 void ThreadPool::joinWorkers()
@@ -90,6 +89,29 @@ void ThreadPool::stopUnlockJoin()
     stopImpl();
     pthread_mutex_unlock(&m_mut);
     joinWorkers();
+}
+
+void ThreadPool::initConds()
+{
+    if (pthread_cond_init(&m_cvNewTask, NULL)) {
+        throw std::runtime_error("Failed to init pthread_cond");
+    }
+
+    if (pthread_cond_init(&m_cvAllReady, NULL)) {
+        throw std::runtime_error("Failed to init pthread_cond");
+    }
+
+    if (pthread_cond_init(&m_cvLowEnrolled, NULL)) {
+        throw std::runtime_error("Failed to init pthread_cond");
+    }
+
+    if (pthread_cond_init(&m_cvNormalEnrolLed, NULL)) {
+        throw std::runtime_error("Failed to init pthread_cond");
+    }
+
+    if (pthread_cond_init(&m_cvHighEnrolled, NULL)) {
+        throw std::runtime_error("Failed to init pthread_cond");
+    }
 }
 
 void ThreadPool::threadFunc() {
@@ -108,6 +130,7 @@ void ThreadPool::threadFunc() {
         if (m_highTasks.empty() && m_normalTasks.empty()) {
             taskPtr = m_lowTasks.front();
             m_lowTasks.pop();
+            pthread_cond_signal(&m_cvLowEnrolled);
         }
 
         if (!taskPtr && !m_highTasks.empty()) {
@@ -115,6 +138,7 @@ void ThreadPool::threadFunc() {
                 taskPtr = m_highTasks.front();
                 m_highTasks.pop();
                 ++m_highTaskResolved;
+                pthread_cond_signal(&m_cvHighEnrolled);
             }
         }
 
@@ -126,6 +150,8 @@ void ThreadPool::threadFunc() {
             } else {
                 m_highTaskResolved -= 3;
             }
+
+            pthread_cond_signal(&m_cvNormalEnrolLed);
         }
 
         if (!isTaskWaiting()) {

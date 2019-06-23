@@ -1,4 +1,5 @@
 #include <iostream>
+#include <unistd.h>
 #include "ThreadPool.hpp"
 
 class CalculateFibonacci {
@@ -21,6 +22,8 @@ public:
             a = b;
             b = m_result;
         }
+
+        sleep(1);
     }
 
     size_t get() const { return m_result; }
@@ -31,17 +34,19 @@ public:
 
 int main()
 {
-    const size_t N = 200;
+    const size_t N = 20000;
     std::vector<CalculateFibonacci> numbers;
     numbers.reserve(N);
     for (size_t i = 0; i < N; ++i) {
         numbers.push_back(CalculateFibonacci(i));
     }
 
-    threadUtils::ThreadPool threadPool(2);
+    threadUtils::ThreadPool threadPool(2, 40);
 
     for (size_t i = 0; i < N; ++i) {
-        threadPool.Enqueue(numbers[i]);
+        std::cout << "Trying to enqueue task[" << i << "]..." << std::flush;
+        threadPool.EnqueueBlocking(numbers[i]);
+        std::cout << "done!" << std::endl;
     }
 
     std::cout << "Jobs for ThreadPool enqueued" << std::endl;
